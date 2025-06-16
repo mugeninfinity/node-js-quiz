@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Security+ Mastery Quiz</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #007bff; --success-color: #28a745; --danger-color: #dc3545;
+            --warning-color: #ffc107; --light-gray: #f8f9fa; --medium-gray: #6c757d;
+            --bg-color: #f0f4f8; --text-color: #333; --container-bg: white; --border-color: #ccc;
+        }
+        body.dark-mode {
+            --bg-color: #121212; --text-color: #e0e0e0; --container-bg: #1e1e1e;
+            --light-gray: #333; --medium-gray: #888; --border-color: #444;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 20px;
+            display: flex; flex-direction: column; align-items: center;
+        }
+        .hidden { display: none !important; }
+        #confetti-canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1001; }
+        @keyframes shake { 10%, 90% { transform: translateX(-1px); } 20%, 80% { transform: translateX(2px); } 30%, 50%, 70% { transform: translateX(-4px); } 40%, 60% { transform: translateX(4px); } }
+        .shake { animation: shake 0.82s cubic-bezier(.36,.07,.19,.97) both; }
+        .quiz-title { text-align: center; color: #0056b3; margin-bottom: 20px; }
+        body.dark-mode .quiz-title { color: var(--primary-color); }
+        .container { background-color: var(--container-bg); border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); padding: 30px 40px; width: 900px; max-width: 95%; margin: 20px auto; }
+        #question-header { display: flex; justify-content: flex-end; align-items: center; margin-bottom: 20px; font-size: 0.9em; color: var(--medium-gray); }
+        #question-text { font-size: 1.4em; margin-bottom: 25px; line-height: 1.4; text-align: left; min-height: 80px;}
+        #answer-buttons { display: grid; grid-template-columns: 1fr; gap: 12px; }
+        #navigation-controls { display: flex; width: 100%; justify-content: flex-end; align-items: center; margin-top: 20px; }
+        .btn { border: none; border-radius: 8px; padding: 12px 25px; font-size: 1em; cursor: pointer; transition: all 0.2s; }
+        .answer-choice label { display: block; background-color: var(--light-gray); color: var(--text-color); border: 1px solid var(--border-color); border-radius: 8px; padding: 15px; cursor: pointer; transition: all 0.2s; }
+        .answer-choice label:hover { background-color: #e2e6ea; }
+        body.dark-mode .answer-choice label:hover { background-color: #444; }
+        .answer-choice input { display: none; }
+        .answer-choice input:checked + label { background-color: var(--primary-color); color: white; border-color: var(--primary-color); }
+        .answer-choice.locked label { cursor: not-allowed; opacity: 0.9; }
+        .answer-choice.correct-answer label { background-color: var(--success-color) !important; border-color: var(--success-color) !important; color: white; }
+        .answer-choice.incorrect-user-choice label { background-color: var(--danger-color) !important; border-color: var(--danger-color) !important; color: white; }
+        .nav-btn { background-color: var(--primary-color); color: white; }
+        .finish-btn { background-color: var(--danger-color); color: white; }
+        #timer-controls { display: flex; align-items: center; justify-content: center; gap: 15px; margin-top: 20px; }
+        #timer { font-weight: bold; color: var(--text-color); font-size: 1.5em; }
+        #overlay, #feedback-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: rgba(0, 0, 0, 0.85); z-index: 1000; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; text-align: center; padding: 20px; }
+        #feedback-overlay { z-index: 1002; background-color: rgba(0, 0, 0, 0.5); }
+        #confirm-text { font-size: 2.5em; margin-bottom: 10px; }
+        #unanswered-count { font-size: 1.2em; color: #ddd; margin-bottom: 25px; }
+        #confirm-buttons { display: flex; flex-direction: column; gap: 15px; }
+        #results-container h1 { color: #0056b3; }
+        body.dark-mode #results-container h1 { color: var(--primary-color); }
+        .results-item { background-color: var(--light-gray); padding: 15px; margin-bottom: 15px; border-left-width: 5px; border-left-style: solid; }
+        .results-item.status-good { border-left-color: var(--success-color); }
+        .results-item.status-ok { border-left-color: var(--warning-color); }
+        .results-item.status-poor { border-left-color: var(--danger-color); }
+        .objective-title { font-size: 1.1em; font-style: italic; color: var(--medium-gray); margin-bottom: 12px; font-weight: bold; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; }
+        .mastery-details { text-align: right; font-style: italic; font-size: 0.9em; color: var(--medium-gray); margin-top: 10px; }
+        #feedback-gif { max-width: 80%; max-height: 80%; border-radius: 15px; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
+        #theme-toggle-btn {
+            font-size: 1.5em; cursor: pointer; background: var(--container-bg); border: 1px solid var(--border-color);
+            border-radius: 8px; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center;
+        }
+        .nav-container { position: relative; display: inline-block; margin-bottom: 20px; }
+        .nav-menu {
+            display: none; position: absolute; background-color: var(--container-bg); min-width: 160px;
+            box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2); z-index: 1003; border-radius: 8px;
+            overflow: hidden; border: 1px solid var(--border-color);
+        }
+        .nav-menu a {
+            color: var(--text-color); padding: 12px 16px; text-decoration: none; display: block; text-align: left;
+        }
+        .nav-menu a:hover { background-color: var(--light-gray); }
+        .nav-menu a.active { background-color: var(--primary-color); color: white; font-weight: bold; }
+        .nav-container:hover .nav-menu { display: block; }
+        #nav-trigger {
+             background-color: var(--container-bg); color: var(--text-color); border: 1px solid var(--border-color);
+        }
+		/* Add these new rules to the bottom of your <style> block */
+
+/* Find the @media print block at the bottom of your CSS and replace it with this */
+/* Find the @media print block at the bottom of your CSS and replace it with this */
+@media print {
+    /* Hide elements we don't want on the printout */
+    .nav-container, #theme-toggle-btn, #timer-controls, #feedback-overlay, 
+    #overlay, #confetti-canvas, #quiz-container, #score-details, 
+    #results-actions { /* ✅ This now correctly targets the button container */
+        display: none !important;
+    }
+
+    /* Reset styles for a clean print layout */
+    body {
+        padding: 0;
+        margin: 20px; /* Add some margin for better print appearance */
+    }
+    .container, #results-container {
+        box-shadow: none;
+        border: none;
+        width: 100%;
+        max-width: 100%;
+        margin: 0;
+        padding: 0;
+    }
+    .results-item {
+        page-break-inside: avoid; /* Tries to keep each result item on one page */
+    }
+}
+    </style>
+</head>
+<body>
+    
+    <div id="feedback-overlay" class="hidden">
+        <img id="feedback-gif" src="" alt="Feedback Animation">
+    </div>
+    <div id="audio-container" style="display: none;"></div>
+    <canvas id="confetti-canvas"></canvas>
+    <div id="overlay" class="hidden"></div>
+    
+    <div class="nav-container">
+        <button id="nav-trigger" class="btn">Navigate Quizzes ▾</button>
+        <div id="nav-menu" class="nav-menu"></div>
+    </div>
+
+    <h1 class="quiz-title">CompTIA Security+ Mastery Quiz</h1>
+    
+    <div class="container">
+        <div id="quiz-container" class="hidden">
+            <div id="question-header">
+                <span id="question-counter"></span>
+            </div>
+            <h2 id="question-text">Loading...</h2>
+            <div id="answer-buttons"></div>
+            <div id="navigation-controls">
+                <button id="next-btn" class="btn nav-btn">Check Answer</button>
+            </div>
+        </div>
+        <div id="results-container" class="hidden">
+            <h1>Mastery Report</h1>
+            <div id="score-details">
+                <p id="score-text"></p>
+                <p id="time-elapsed-text"></p>
+            </div>
+			<div id="filter-controls" style="margin: 20px 0; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+    <strong>Filter View:</strong>
+    </div>
+
+			
+            <div id="chart-container" style="width: 100%; max-width: 800px; margin: 40px auto;">
+                <canvas id="results-chart"></canvas>
+            </div>
+            <div id="results-list"></div>
+<div id="results-actions" style="text-align: center; margin-top: 20px;">
+    <button class="btn" id="restart-btn">Restart Quiz</button>
+    <button id="print-btn" class="btn">Print Report</button>
+</div>
+        </div>
+    </div>
+    
+    <div id="timer-controls">
+        <div id="timer">00:00</div>
+        <button id="theme-toggle-btn">🌙</button>
+    </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+
+    function loadQuiz() {
+        const path = window.location.pathname;
+        let pageName = path.split('/').pop().replace('.html', '');
+        if (pageName === '') pageName = 'index';
+        const questionScript = document.createElement('script');
+        questionScript.src = `/questions/${pageName}-questions.js`;
+        document.head.appendChild(questionScript);
+        questionScript.onload = () => {
+            if (typeof ALL_QUESTIONS !== 'undefined' && ALL_QUESTIONS.length > 0) {
+                initializeApp(ALL_QUESTIONS);
+            } else {
+                alert(`Error: Could not load questions for '${pageName}'. Check that the file exists and is not empty.`);
+            }
+        };
+        questionScript.onerror = () => {
+            alert(`Error: Failed to load script '/questions/${pageName}-questions.js'.`);
+        };
+    }
+
+    async function initializeApp(questions) {
+        const elements = {
+            body: document.body,
+            container: document.querySelector('.container'),
+            quizTitle: document.querySelector('.quiz-title'),
+            themeToggleBtn: document.getElementById('theme-toggle-btn'),
+            quizContainer: document.getElementById('quiz-container'),
+            resultsContainer: document.getElementById('results-container'),
+            timerText: document.getElementById('timer'),
+            questionCounterText: document.getElementById('question-counter'),
+            questionText: document.getElementById('question-text'),
+            answerButtonsElement: document.getElementById('answer-buttons'),
+            nextBtn: document.getElementById('next-btn'),
+            restartBtn: document.getElementById('restart-btn'),
+			    printBtn: document.getElementById('print-btn'), // ✅ ADD THIS LINE
+            scoreText: document.getElementById('score-text'),
+            timeElapsedText: document.getElementById('time-elapsed-text'),
+            resultsList: document.getElementById('results-list'),
+            overlay: document.getElementById('overlay'),
+            feedbackOverlay: document.getElementById('feedback-overlay'),
+            feedbackGif: document.getElementById('feedback-gif'),
+            audioContainer: document.getElementById('audio-container'),
+            navMenu: document.getElementById('nav-menu'),
+			    filterControls: document.getElementById('filter-controls'), // ✅ ADD THIS LINE
+        };
+
+        let correctSounds = [], incorrectSounds = [];
+        let quizTimerInterval, quizStartTime, currentQuestionIndex;
+        let masterQuizData = [], quizData = [];
+        
+        async function populateNav() {
+            try {
+                const response = await fetch('/api/get-pages');
+                if (!response.ok) throw new Error('Failed to fetch pages');
+                const pages = await response.json();
+                let currentPage = window.location.pathname.split('/').pop();
+                if (currentPage === '') currentPage = 'index.html';
+                elements.navMenu.innerHTML = '';
+                pages.forEach(page => {
+                    const link = document.createElement('a');
+                    link.href = page;
+                    link.textContent = page.replace('.html', '').charAt(0).toUpperCase() + page.replace('.html', '').slice(1);
+                    if (page === currentPage) link.classList.add('active');
+                    elements.navMenu.appendChild(link);
+                });
+            } catch (error) {
+                console.error("Failed to populate navigation:", error);
+                if (elements.navMenu) elements.navMenu.parentElement.style.display = 'none';
+            }
+        }
+        
+        function createAudioElements(soundList) {
+            if (!elements.audioContainer) return;
+            soundList.forEach(soundFile => {
+                const audio = document.createElement('audio');
+                const soundId = 'sound-' + soundFile.split('/').pop().replace('.mp3', '');
+                audio.id = soundId;
+                audio.src = soundFile;
+                audio.preload = 'auto';
+                elements.audioContainer.appendChild(audio);
+            });
+        }
+
+        try {
+            const response = await fetch('/api/get-sounds');
+            const sounds = await response.json();
+            correctSounds = sounds.correct || [];
+            incorrectSounds = sounds.incorrect || [];
+            createAudioElements(correctSounds);
+            createAudioElements(incorrectSounds);
+        } catch (error) {
+            console.error('Failed to fetch sound files:', error);
+        }
+
+        function showFeedbackGif(soundFile, type) {
+            const specificGifPath = `${soundFile.substring(0, soundFile.lastIndexOf('.'))}.gif`;
+            const defaultGifPath = `audio/default${type === 'correct' ? 'y' : 'n'}.gif`;
+            const gifImage = elements.feedbackGif;
+            gifImage.onerror = () => { gifImage.src = defaultGifPath; gifImage.onerror = null; };
+            gifImage.src = specificGifPath;
+            elements.feedbackOverlay.classList.remove('hidden');
+            setTimeout(() => {
+                elements.feedbackOverlay.classList.add('hidden');
+                gifImage.src = "";
+            }, 1800);
+        }
+        
+        function playRandomSound(type) {
+            const soundArray = type === 'correct' ? correctSounds : incorrectSounds;
+            if (!soundArray || soundArray.length === 0) return;
+            const randomSoundFile = soundArray[Math.floor(Math.random() * soundArray.length)];
+            const soundId = 'sound-' + randomSoundFile.split('/').pop().replace('.mp3', '');
+            const audioElement = document.getElementById(soundId);
+            if (audioElement) {
+                audioElement.currentTime = 0;
+                audioElement.play().catch(err => {
+                    if (err.name !== 'AbortError') console.error(`Error playing ${soundId}:`, err);
+                });
+            }
+            showFeedbackGif(randomSoundFile, type);
+        }
+        
+        function showQuestion(index, thisAttemptWasCorrect = null) {
+            const quizItem = quizData[index];
+            currentQuestionIndex = index;
+            const pageTitle = quizItem.questionData.objective || 'Security+ Quiz';
+            document.title = pageTitle;
+            elements.quizTitle.textContent = pageTitle;
+            elements.container.classList.remove('shake');
+            elements.questionText.innerText = quizItem.questionData.question;
+            elements.questionCounterText.innerText = `Question ${index + 1} of ${quizData.length}`;
+            elements.answerButtonsElement.innerHTML = '';
+            
+            if (!quizItem.shuffledOptions) {
+                quizItem.shuffledOptions = [...quizItem.questionData.options].sort(() => Math.random() - 0.5);
+            }
+            quizItem.shuffledOptions.forEach(option => {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'answer-choice';
+                if (quizItem.isSubmitted) wrapper.classList.add('locked');
+                const inputId = `q${index}-option-${option.replace(/\s+/g, '-')}`;
+                wrapper.innerHTML = `<input type="radio" id="${inputId}" name="question${index}" value="${option}" ${quizItem.isSubmitted ? 'disabled' : ''}><label for="${inputId}">${option}</label>`;
+                if (quizItem.userAnswer === option) wrapper.querySelector('input').checked = true;
+                if (!quizItem.isSubmitted) {
+                    wrapper.querySelector('label').onclick = (e) => {
+                        e.preventDefault();
+                        document.querySelectorAll(`input[name="question${index}"]`).forEach(rb => rb.checked = false);
+                        wrapper.querySelector('input').checked = true;
+                        quizItem.userAnswer = option;
+                    };
+                }
+                elements.answerButtonsElement.appendChild(wrapper);
+            });
+            if (quizItem.isSubmitted) {
+                document.querySelectorAll(`input[name="question${index}"]`).forEach(input => {
+                    const wrapper = input.parentElement;
+                    if (input.value === quizItem.questionData.answer) wrapper.classList.add('correct-answer');
+                    if (input.value === quizItem.userAnswer && thisAttemptWasCorrect === false) wrapper.classList.add('incorrect-user-choice');
+                });
+            }
+            updateNavButtons();
+        }
+
+        function handleNextClick() {
+            if (elements.nextBtn.textContent.includes('Finish')) {
+                confirmFinishTest();
+                return;
+            }
+            const quizItem = quizData[currentQuestionIndex];
+            if (quizItem.isSubmitted) {
+                changeQuestion(1);
+            } else {
+                if (quizItem.userAnswer === null) return alert("Please select an answer.");
+                quizItem.attempts.push(quizItem.userAnswer);
+                quizItem.isSubmitted = true;
+                const isThisAttemptCorrect = quizItem.userAnswer === quizItem.questionData.answer;
+                
+                if (isThisAttemptCorrect) {
+                    quizItem.isMastered = true;
+                    playRandomSound('correct');
+                    if (window.confetti) confetti({ particleCount: 150, spread: 90, origin: { y: 0.6 } });
+                } else {
+                    playRandomSound('incorrect');
+                    elements.container.classList.add('shake');
+                    setTimeout(() => elements.container.classList.remove('shake'), 820);
+                }
+                setTimeout(() => {
+                    showQuestion(currentQuestionIndex, isThisAttemptCorrect);
+                }, 10);
+            }
+        }
+        
+        function handleKeyPress(e) {
+            if (!elements.overlay.classList.contains('hidden') || !elements.resultsContainer.classList.contains('hidden')) return;
+            if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                if (!elements.nextBtn.disabled) elements.nextBtn.click();
+            }
+            const keyMap = { 'a': 0, '1': 0, 'b': 1, '2': 1, 'c': 2, '3': 2, 'd': 3, '4': 3 };
+            const targetIndex = keyMap[e.key.toLowerCase()];
+            if (targetIndex !== undefined) {
+                const answerLabels = elements.answerButtonsElement.querySelectorAll('.answer-choice label');
+                const targetLabel = answerLabels[targetIndex];
+                if (targetLabel && !targetLabel.parentElement.classList.contains('locked')) {
+                    targetLabel.click();
+                }
+            }
+        }
+
+        function updateNavButtons() {
+            if (!quizData[currentQuestionIndex]) return;
+            const isLastQuestion = currentQuestionIndex === quizData.length - 1;
+            const currentQuestion = quizData[currentQuestionIndex];
+            if(isLastQuestion && currentQuestion.isSubmitted) {
+                elements.nextBtn.innerText = 'Finish';
+                elements.nextBtn.classList.add('finish-btn');
+            } else {
+                elements.nextBtn.innerText = currentQuestion.isSubmitted ? 'Next ▶' : 'Check Answer';
+                elements.nextBtn.classList.remove('finish-btn');
+            }
+            elements.nextBtn.disabled = false;
+        }
+
+        function changeQuestion(direction) {
+            const newIndex = currentQuestionIndex + direction;
+            if (newIndex >= 0 && newIndex < quizData.length) showQuestion(newIndex);
+        }
+
+        function confirmFinishTest() {
+            const missedQuestions = masterQuizData.filter(item => !item.isMastered);
+            if (missedQuestions.length > 0) {
+                elements.overlay.innerHTML = `<div id="confirm-text">On to the next round!</div><p id="unanswered-count">You have ${missedQuestions.length} question(s) left to master.</p>`;
+                elements.overlay.classList.remove('hidden');
+                setTimeout(() => {
+                    elements.overlay.classList.add('hidden');
+                    startNewRound(missedQuestions);
+                }, 2000);
+            } else {
+                finishTest();
+            }
+        }
+
+        function startNewRound(missedQuestions) {
+            quizData = missedQuestions.map(q => {
+                q.userAnswer = null;
+                q.isSubmitted = false;
+                q.shuffledOptions = null;
+                return q;
+            }).sort(() => Math.random() - 0.5);
+            currentQuestionIndex = 0;
+            showQuestion(0);
+        }
+
+        function finishTest() {
+            clearInterval(quizTimerInterval);
+            const timeTaken = Math.round((Date.now() - quizStartTime) / 1000);
+            displayResults(masterQuizData, timeTaken);
+        }
+        
+function calculateChartData(resultsData) {
+    const topicStats = {};
+    const topLevelDomains = new Set(resultsData.map(r => (r.questionData.objective || 'Uncategorized').split('.')[0]));
+    const useTopLevelDomain = topLevelDomains.size > 1;
+
+    resultsData.forEach(result => {
+        const objective = result.questionData.objective || "Uncategorized";
+        let key;
+        if (useTopLevelDomain) {
+            const domainMatch = objective.match(/\d+/);
+            key = domainMatch ? `Domain ${domainMatch[0]}` : "Uncategorized";
+        } else {
+            const sectionMatch = objective.match(/(\d+\.\d+)|(\d+)/);
+            key = sectionMatch ? `Section ${sectionMatch[0]}` : "Uncategorized";
+        }
+        if (!topicStats[key]) {
+            topicStats[key] = { totalMasteryScore: 0, questionCount: 0 };
+        }
+        const attemptCount = result.attempts.length || 1;
+        const masteryScore = 1 / attemptCount;
+        topicStats[key].totalMasteryScore += masteryScore;
+        topicStats[key].questionCount++;
+    });
+
+    const labels = Object.keys(topicStats).sort((a, b) => parseFloat(a.match(/[\d\.]+/)[0]) - parseFloat(b.match(/[\d\.]+/)[0]));
+    const data = labels.map(label => {
+        const stats = topicStats[label];
+        const averageMastery = (stats.totalMasteryScore / stats.questionCount) * 100;
+        return averageMastery.toFixed(2);
+    });
+    return { labels, data };
+}
+
+        function renderBarChart(labels, data) {
+            const chartElement = document.getElementById('results-chart');
+            if (!chartElement) return;
+            const ctx = chartElement.getContext('2d');
+            if(window.myResultsChart) window.myResultsChart.destroy();
+
+            const backgroundColors = data.map(score => {
+                if (score >= 85) return 'rgba(40, 167, 69, 0.6)';
+                if (score >= 70) return 'rgba(255, 193, 7, 0.6)';
+                return 'rgba(220, 53, 69, 0.6)';
+            });
+            const borderColors = data.map(score => {
+                if (score >= 85) return 'rgba(40, 167, 69, 1)';
+                if (score >= 70) return 'rgba(255, 193, 7, 1)';
+                return 'rgba(220, 53, 69, 1)';
+            });
+
+            window.myResultsChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Mastery Score (%)',
+                        data: data,
+                        backgroundColor: backgroundColors,
+                        borderColor: borderColors,
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    plugins: {
+                        title: { display: true, text: 'Performance by Topic (Higher is Better)', font: { size: 18 } },
+                        tooltip: { callbacks: { label: (context) => `Mastery Score: ${context.parsed.x.toFixed(1)}%` } }
+                    },
+                    scales: { x: { beginAtZero: true, max: 100, title: { display: true, text: 'Mastery Percentage' } } }
+                }
+            });
+        }
+        
+ function displayResults(finalResultsData, timeTaken) {
+    elements.quizContainer.classList.add('hidden');
+    elements.resultsContainer.classList.remove('hidden');
+    elements.overlay.classList.add('hidden');
+    
+    const totalAttempts = finalResultsData.reduce((acc, q) => acc + (q.attempts.length || 1), 0);
+    elements.scoreText.textContent = `Congratulations! You mastered all ${finalResultsData.length} questions in ${totalAttempts} total attempts.`;
+    const minutes = Math.floor(timeTaken / 60);
+    const seconds = timeTaken % 60;
+    elements.timeElapsedText.textContent = `Total Time Taken: ${minutes} min ${seconds < 10 ? '0' : ''}${seconds} sec`;
+    
+    const chartData = calculateChartData(finalResultsData);
+    if (chartData.labels.length > 0) {
+        renderBarChart(chartData.labels, chartData.data);
+    }
+    
+    // ✅ NEW: Logic to create and manage filter buttons
+    elements.filterControls.innerHTML = '<strong>Filter View:</strong>'; // Clear previous
+    const allButton = document.createElement('button');
+    allButton.className = 'btn filter-btn active';
+    allButton.dataset.filter = 'all';
+    allButton.textContent = 'All';
+    elements.filterControls.appendChild(allButton);
+
+    chartData.labels.forEach(label => {
+        const button = document.createElement('button');
+        button.className = 'btn filter-btn';
+        button.dataset.filter = label;
+        button.textContent = label;
+        elements.filterControls.appendChild(button);
+    });
+    
+    elements.filterControls.addEventListener('click', (e) => {
+        if (e.target.matches('.filter-btn')) {
+            elements.filterControls.querySelector('.active').classList.remove('active');
+            e.target.classList.add('active');
+            renderResultsList(finalResultsData, e.target.dataset.filter);
+        }
+    });
+    // END NEW LOGIC
+
+    // Initial render shows all results
+    renderResultsList(finalResultsData, 'all');
+}
+
+function renderResultsList(resultsData, filter = 'all') {
+    // Determine how to group topics, same logic as the chart
+    const topLevelDomains = new Set(resultsData.map(r => (r.questionData.objective || 'Uncategorized').split('.')[0]));
+    const useTopLevelDomain = topLevelDomains.size > 1;
+
+    // Filter the results based on the selected topic
+    const filteredResults = filter === 'all' ? resultsData : resultsData.filter(result => {
+        const objective = result.questionData.objective || "Uncategorized";
+        let key;
+        if (useTopLevelDomain) {
+            const domainMatch = objective.match(/\d+/);
+            key = domainMatch ? `Domain ${domainMatch[0]}` : "Uncategorized";
+        } else {
+            const sectionMatch = objective.match(/(\d+\.\d+)|(\d+)/);
+            key = sectionMatch ? `Section ${sectionMatch[0]}` : "Uncategorized";
+        }
+        return key === filter;
+    });
+
+    elements.resultsList.innerHTML = '';
+    filteredResults.forEach(result => {
+        // The rest of this function (creating the 'item' and its innerHTML) remains exactly the same as before
+        const item = document.createElement('div');
+        let attemptCount = result.attempts.length;
+        if (attemptCount === 0) {
+            attemptCount = 1;
+            result.attempts.push(result.questionData.answer);
+        }
+        const masteryScore = (1 / attemptCount) * 100;
+        let statusClass = '';
+        if (masteryScore >= 85) statusClass = 'status-good';
+        else if (masteryScore >= 70) statusClass = 'status-ok';
+        else statusClass = 'status-poor';
+        item.classList.add('results-item', statusClass);
+        const scoreText = `(${(masteryScore).toFixed(0)}%)`;
+        let attemptsHtml = '';
+        result.attempts.forEach((attempt, index) => {
+            if (index === result.attempts.length - 1) {
+                attemptsHtml += `<p><b>Final Answer:</b> <span style="color: green;">${attempt}</span></p>`;
+            } else {
+                attemptsHtml += `<p>Attempt ${index + 1}: <span style="color: red;">${attempt}</span></p>`;
+            }
+        });
+        item.innerHTML = `
+            ${result.questionData.objective ? `<h4 class="objective-title">${result.questionData.objective}</h4>` : ''}
+            <p class="results-item-header"><b>${result.questionData.question}</b></p>
+            <div class="attempt-history">
+                ${attemptsHtml}
+                <p><b>Correct Answer:</b> <span style="color: green;">${result.questionData.answer}</span></p>
+                <p><b>Explanation:</b> ${result.questionData.explanation || "No explanation provided."}</p>
+            </div>
+            <p class="mastery-details">- Mastered in ${attemptCount} attempt${attemptCount > 1 ? 's' : ''} ${scoreText}</p>`;
+        elements.resultsList.appendChild(item);
+    });
+}
+
+        function startGlobalTimer(duration) {
+            let totalTimeLeft = duration;
+            clearInterval(quizTimerInterval);
+            const updateTimerDisplay = () => {
+                const minutes = Math.floor(totalTimeLeft / 60);
+                const seconds = totalTimeLeft % 60;
+                // ✅ All template literals are corrected with backticks (`)
+                elements.timerText.textContent = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+            }
+            updateTimerDisplay();
+            quizTimerInterval = setInterval(() => {
+                if (!window.isPaused) {
+                    totalTimeLeft--;
+                    updateTimerDisplay();
+                    if (totalTimeLeft <= 0) {
+                        clearInterval(quizTimerInterval);
+                        confirmFinishTest();
+                    }
+                }
+            }, 1000);
+        }
+        
+        function beginQuizWithSelection(selection) {
+            masterQuizData = selection.map(q => ({
+                questionData: q, isMastered: false, attempts: [], userAnswer: null, isSubmitted: false, shuffledOptions: null, 
+            }));
+            quizData = [...masterQuizData].sort(() => Math.random() - 0.5);
+            currentQuestionIndex = 0;
+            window.isPaused = false;
+            elements.quizContainer.classList.remove('hidden');
+            elements.resultsContainer.classList.add('hidden');
+            elements.overlay.classList.add('hidden');
+            quizStartTime = Date.now();
+            startGlobalTimer(quizData.length * 90);
+            showQuestion(0);
+        }
+
+function startQuiz() {
+    // This is the helper function that actually builds the quiz data and starts the first question.
+    // It is now correctly defined within the scope of initializeApp.
+    function beginQuizWithSelection(selection) {
+        masterQuizData = selection.map(q => ({
+            questionData: q,
+            isMastered: false,
+            attempts: [],
+            userAnswer: null,
+            isSubmitted: false,
+            shuffledOptions: null, 
+        }));
+        quizData = [...masterQuizData].sort(() => Math.random() - 0.5);
+        currentQuestionIndex = 0;
+        window.isPaused = false;
+        elements.quizContainer.classList.remove('hidden');
+        elements.resultsContainer.classList.add('hidden');
+        elements.overlay.classList.add('hidden');
+        quizStartTime = Date.now();
+        startGlobalTimer(quizData.length * 90);
+        showQuestion(0);
+    }
+
+    // --- Main logic for startQuiz begins here ---
+    elements.quizContainer.classList.add('hidden');
+    elements.resultsContainer.classList.add('hidden');
+    
+    const totalCount = questions.length;
+    const uniqueCounts = [...new Set([0.25, 0.50, 0.75, 1].map(p => Math.min(totalCount, Math.ceil(totalCount * p))))];
+    
+    const options = uniqueCounts.map(count => ({
+        percent: Math.round((count / totalCount) * 100),
+        count: count
+    }));
+    
+    let buttonsHtml = '';
+    options.forEach(opt => {
+        // ✅ FIX: Using backticks (`) to build the button HTML.
+        buttonsHtml += `<button class="btn" data-count="${opt.count}">${opt.count} Questions (${opt.percent}%)</button>`;
+    });
+
+    // ✅ FIX: Using backticks (`) for the main overlay HTML.
+    elements.overlay.innerHTML = `
+        <div id="confirm-text">Select Quiz Length</div>
+        <p id="unanswered-count">Choose how many questions you'd like to answer.</p>
+        <div id="confirm-buttons">
+            ${buttonsHtml}
+        </div>`;
+    elements.overlay.classList.remove('hidden');
+
+    // Add event listeners to the new buttons
+    elements.overlay.querySelectorAll('.btn').forEach(button => {
+        button.addEventListener('click', (e) => {
+            const selectedCount = parseInt(e.target.dataset.count, 10);
+            const selectedQuestions = [...questions].sort(() => 0.5 - Math.random()).slice(0, selectedCount);
+            // Now call the correctly-scoped helper function
+            beginQuizWithSelection(selectedQuestions);
+        });
+    });
+}
+        
+        populateNav();
+        elements.nextBtn.addEventListener('click', handleNextClick);
+        elements.restartBtn.addEventListener('click', startQuiz);
+        elements.themeToggleBtn.addEventListener('click', () => {
+            document.body.classList.toggle('dark-mode');
+            localStorage.setItem('theme', document.body.classList.contains('dark-mode') ? 'dark' : 'light');
+            elements.themeToggleBtn.innerText = document.body.classList.contains('dark-mode') ? '☀️' : '🌙';
+        });
+        
+        document.addEventListener('keydown', handleKeyPress);
+        elements.printBtn.addEventListener('click', () => window.print());
+
+		
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme === 'dark') {
+            document.body.classList.add('dark-mode');
+            elements.themeToggleBtn.innerText = '☀️';
+        }
+        
+        startQuiz();
+    }
+    
+    loadQuiz();
+});
+</script>
+
+</body>
+</html>
